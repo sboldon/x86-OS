@@ -1,12 +1,14 @@
+; 16-bit real mode printing routines.
+
 ; Empty hex string template.
 HEX_OUT:
   db '0x0000', 0
 
 ; Print number in DX.
 print_hex:
-  push bx
-  push ax
-  mov bx, HEX_OUT + 5 ; Address of LSB in hex string template.
+    push bx
+    push ax
+    mov bx, HEX_OUT + 5 ; Address of LSB in hex string template.
   start:
     test dx, dx
     je fin
@@ -32,8 +34,8 @@ print_hex:
 
 ; Print null-terminated string in BX.
 print_string:
-  push bx
-  mov ah, 0x0e       ; Put BIOS in TTY mode.
+    push bx
+    mov ah, 0x0e       ; Put BIOS in TTY mode.
   start_b:
     mov al, [bx]
     cmp al, 0

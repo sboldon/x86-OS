@@ -2,28 +2,29 @@
 ; BIOS expects boot loader at this address.
 org 0x7c00 
 
-mov [BOOT_DRIVE], dl      ; BIOS will populate DL with drive number on start up.
-mov bx, 0x7e00            ; Load at address 0x7e00 = 0x7c00 + sizeof(sector).
-mov dh, 2                 ; Load two sectors.
-call load_disk
-mov dx, [0x7e00]          ; First word of sector loaded into memory.
-call print_hex
-mov dx, [0x7e00 + 512]
-call print_hex
+mov bp, 0x9000            ; Initialize stack
+mov sp, bp
 
-jmp $                     ; Jump to current memory address. (Infinite loop)
+mov bx, RM_MSG
+call print_string
+call switch_to_prot_mode  ; Switch to 32 bit protected mode
 
-%include "print.asm"
-%include "load_disk.asm"
+%include "print.asm"      ; 16 bit real mode printing via BIOS interrupts
+%include "gdt.asm"        ; GDT structure
+%include "prot_mode.asm"  ; Routines to switch into protected mode and initialize segment registers.
+%include "prot_print.asm" ; 32 bit protected mode printing via writing to video memory.
 
-BOOT_DRIVE: db 0
+bits 32
+PROT_MODE:
+  mov ebx, PM_MSG 
+  call print_string_prot
+  jmp $
+
+RM_MSG db "In 16 bit real mode", 0 
+PM_MSG db "Switched to 32 bit protected mode", 0
 
 ; Insert number of 0 bytes needed to place 0xaa55 at bytes 511 and 512.
 ; $$ is section start, $$ - $ = current addr - section start = len of previous code.
 times 510-($-$$) db 0
 dw 0xaa55                 ; Tells BIOS to boot system.
-
-; Fill next two sectors of disk
-times 512 db 'A'          
-times 512 db 'B'
 
