@@ -1,2 +1,5 @@
+*.o
 *.bin
 *.swp
+
+os-image
