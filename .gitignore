@@ -2,4 +2,7 @@
 *.bin
 *.swp
 
-os-image
+_build/
+
+.ccls-cache/
+compile_commands.json

@@ -1,6 +1,6 @@
 ; Tell assembler to use this address as base address of the section of the file.
 ; BIOS expects boot loader at this address.
-org 0x7c00 
+org 0x7c00
 
 KERNEL_OFFSET equ 0x1000  ; Memory location that kernel will be loaded
 
@@ -20,23 +20,23 @@ call switch_to_prot_mode  ; Switch into 32 bit protected mode.
 %include "prot_mode.asm"  ; Routines to switch into protected mode and initialize segment registers.
 %include "prot_print.asm" ; 32 bit protected mode printing via writing to video memory.
 
-bits 16 
+bits 16
 load_kernel:
-  mov bx, LOAD_MSG 
+  mov bx, LOAD_MSG
   call print_string
-  mov dh, 1 
+  mov dh, 3
   mov bx, KERNEL_OFFSET
   call load_disk          ; Load DH sectors from disk at KERNEL_OFFSET address
   ret
 
 bits 32
 PROT_MODE:                ; Operating in protected mode
-  mov ebx, PM_MSG 
+  mov ebx, PM_MSG
   call print_string_prot
   call KERNEL_OFFSET      ; Jump to address of loaded kernel
   jmp $
 
-RM_MSG     db "Starting boot in 16 bit real mode", 0 
+RM_MSG     db "Starting boot in 16 bit real mode", 0
 LOAD_MSG   db "Loading kernel", 0
 PM_MSG     db "Switched to 32 bit protected mode", 0
 BOOT_DRIVE db 0

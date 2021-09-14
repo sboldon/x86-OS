@@ -39,11 +39,18 @@ print_string:
   start_b:
     mov al, [bx]
     cmp al, 0
-    je fin_b 
-    int 0x10 
-    inc bx       
+    je fin_b
+    int 0x10
+    inc bx
     jmp start_b
   fin_b:
     pop bx
     ret
+
+; Set
+
+; Move cursor to row DH and col DL
+update_cursor:
+    mov ah, 0x02 ; Set cursor position
+    int 0x10
 
