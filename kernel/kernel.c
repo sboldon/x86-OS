@@ -1,21 +1,23 @@
-#include <stddef.h>
-#include "vga_screen.h"
-
 #if defined(__linux__)
-	#error "kernel must be built with a cross-compiler"
+  #error "kernel must be built with a cross-compiler"
 #elif !defined(__i386__)
-	#error "kernel must be built with an x86-elf compiler"
+  #error "kernel must be built with an x86-elf compiler"
 #endif
 
-// Example monolithic kernel.
+#include "idt.h"
+#include "screen.h"
+
+// Example monolithic kernel :)
 void main(void) {
-  // TODO: Move struct creation inside keyboard driver once it is created. The struct will be of an
-  // abstract type for all client code, but cannot actualize this until dynamic allocation is
-  // implemented.
+  idt_init();
+
   struct screen_position pos;
-  set_screen_pos(&pos, 0, 0);
-  set_colors(&pos, LIGHT_MAGENTA, DARK_GRAY);
-  init_screen(&pos);
-  print(&pos, "Hello\nWorld!");
+  screen_set_colors(&pos, LIGHT_MAGENTA, DARK_GRAY);
+  screen_init(&pos);
+  screen_puts("Hello World!\n");
+
+  // Test interrupt handling.
+  __asm__ volatile ("int $0x0");
+  for (;;);
 }
 

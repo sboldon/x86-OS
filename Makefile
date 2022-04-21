@@ -1,64 +1,82 @@
+# TODO: Separate release builds and debug builds into their own build pipeline and build directory.
 CC = i686-elf-gcc
 AS = nasm
-CFLAGS = -std=c11 -Wall -ffreestanding
-ASFLAGS = -f elf
-LDFLAGS = -Wl,--oformat=binary -Ttext 0x1000 -nostdlib -lgcc
+GDB = i386-elf-gdb
+QEMU = qemu-system-i386
 
-TARGET ?= kernel.img
+MKDIR ?= @mkdir -p
+
+IMG ?= kernel.img
 BUILD_DIR ?= _build
+TARGET := $(BUILD_DIR)/$(IMG)
+
+CFLAGS = -std=c11 -Wall -ffreestanding -g
+ASFLAGS = -f elf -g
+LDFLAGS = -Ttext 0x1000 -nostdlib -lgcc
+QEMUFLAGS := -drive format=raw,media=disk,file=$(TARGET)
+
 BOOT_DIR ?= boot
 KERNEL_DIR ?= kernel
-SRC_DIRS ?= $(KERNEL_DIR) drivers
+SRC_DIRS := $(KERNEL_DIR) cpu drivers lib
 
-BOOT_SRCS := $(wildcard $(BOOT_DIR)/*.asm)
+BOOT_SOURCES := $(wildcard $(BOOT_DIR)/*.asm)
 
 # Ensure kernel entry code is built first and will be first in the generated binary file.
-SRCS := $(shell find $(SRC_DIRS) -name *.c -or -name *.asm -and -name ^start.asm)
-SRCS := $(KERNEL_DIR)/start.asm $(SRCS)
+SOURCES := $(shell find $(SRC_DIRS) -name '*.c' -or -name '*.asm')
+SOURCES := $(filter-out start.asm, $(SOURCES))
+SOURCES := $(KERNEL_DIR)/start.asm $(SOURCES)
 
-# Turn ./<dir>/<file>.<ext> into ./<BUILD_DIR>/<dir>/<file>.o
-OBJS := $(foreach file, $(SRCS), $(basename $(file)))
-OBJS := $(OBJS:%=$(BUILD_DIR)/%.o)
+# Turn ./<dir>/<file>.<ext> into ./<BUILD_DIR>/<dir>/<file>.<ext>.o
+OBJS := $(SOURCES:%=$(BUILD_DIR)/%.o)
+
+# Automatically generate dependency files from source files using include directories.
 DEPS := $(OBJS:.o=.d)
-
-INC_DIRS := $(shell find $(SRC_DIRS) -type d)
+INC_DIRS := $(shell find $(SRC_DIRS) -type d -name "*include")
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
-
-# Automatically generate dependency files from source files.
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
 
+####################################################################################################
 
-.PHONY: all
+.PHONY: all run run_debug clean
 
-all: $(BUILD_DIR)/$(TARGET)
+all: $(TARGET)
 
-# Create bootable OS image
-$(BUILD_DIR)/$(TARGET): $(BUILD_DIR)/$(BOOT_DIR)/boot.bin $(BUILD_DIR)/kernel.bin
-	cat $^ > $@
+run: $(TARGET)
+	$(QEMU)	$(QEMUFLAGS)
+
+# QEMU option `-s` accepts a GDB connection on localhost:1234 and option `-S` freezes CPU on start
+# up.
+run_debug: $(TARGET) $(BUILD_DIR)/kernel.elf
+	$(QEMU)	$(QEMUFLAGS) -s -S &
+	$(GDB) -ex "target remote localhost:1234" -ex "symbol-file $(BUILD_DIR)/kernel.elf"
+
+# Create bootable OS image.
+$(TARGET): $(BUILD_DIR)/$(BOOT_DIR)/boot.bin $(BUILD_DIR)/kernel.bin
+	@cat $^ > $@
 
 $(BUILD_DIR)/kernel.bin: $(OBJS)
+	$(CC) $^ -o $@ -Wl,--oformat=binary $(LDFLAGS)
+
+# Symbol info for debugging with GDB.
+$(BUILD_DIR)/kernel.elf: $(OBJS)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-# C source
-$(BUILD_DIR)/%.o: %.c
-	$(MKDIR_P) $(dir $@)
+# Kernel C sources.
+$(BUILD_DIR)/%.c.o: %.c
+	$(MKDIR) $(dir $@)
 	$(CC) -c $< -o $@ $(CPPFLAGS) $(CFLAGS)
 
-# Kernel assembly
-$(BUILD_DIR)/%.o: %.asm
-	$(MKDIR_P) $(dir $@)
+# Kernel assembly sources.
+$(BUILD_DIR)/%.asm.o: %.asm
+	$(MKDIR) $(dir $@)
 	$(AS) $< -o $@ $(ASFLAGS)
 
-# Boot assembly
-$(BUILD_DIR)/%.bin: %.asm $(BOOT_SRCS)
-	$(MKDIR_P) $(dir $@)
+# Boot assembly sources.
+$(BUILD_DIR)/%.bin: %.asm $(BOOT_SOURCES)
+	$(MKDIR) $(dir $@)
 	$(AS) $< -o $@ -f bin -I$(BOOT_DIR)
 
-.PHONY: clean
 clean:
 	$(RM) -r $(BUILD_DIR)
 
 -include $(DEPS)
-
-MKDIR_P ?= @mkdir -p
-
